@@ -1,0 +1,161 @@
+
+CEP-1 : CI/CD Deployment Using Ansible CM Tool
+=============================================
+
+Step 1: Configure Jenkins server as Ansible provisioning machine
+
+In the Ansible lab, connect to master node terminal
+
+Ansible is inatlled on this server.
+
+# ansible --version
+
+If ansible is not present:
+
+sudo apt-get update
+sudo apt-get install software-properties-common -y
+sudo apt-add-repository --yes --update ppa:ansible/ansible
+sudo apt-get install ansible -y
+ansible --version
+
+======================
+
+Install jenkins on Master terminal
+
+> Install java
+
+# sudo apt install default-jre -y
+
+> Install jenkins
+
+Install jenkins
+============================
+
+ curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | sudo tee /usr/share/keyrings/jenkins-keyring.asc > /dev/null
+ 
+ echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/ | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+ 
+  sudo apt-get update
+  
+  sudo apt-get install jenkins -y
+  
+  sudo systemctl start jenkins
+  
+  ================================
+
+Configure jenkins and loginto jenkins.
+====================================
+
+Step 2: Install Ansible plugins in Jenkins CI server
+
+Manage Jenkins--> plugins --> available plugins --> Search for plugin Ansible>> click on install without restart.
+
+Configure ANsible tool in jenkins
+
+Manage Jenkins--> Configure Tools --> Scroll down to find Ansible --> Add ansible--> give name as myansible-->give path as /usr/bin
+
+Save it.
+
+==============================
+
+Playbook to install mavena nd docker on worker node:
+
+---
+- hosts: webserver
+  become: true
+  tasks:
+  - name: update apt-get repo
+    command: sudo apt-get update
+  - name: Install maven on servers
+    command: sudo apt-get install maven -y
+  - name: install docker on servers
+    command: sudo apt-get install -y docker-ce
+  - name: start docker on servers
+    service: name=docker state=started
+
+Playbook to Deploy
+
+- hosts: webserver
+  become: true
+  tasks:
+  - name: Clone git repo
+    git: repo=https://github.com/Sonal0409/DevOpsCodeDemo.git dest=/tmp/myrepo
+  - name: Build the code
+    command: chdir=/tmp/myrepo mvn package
+  - name: Copy the war file in current directory
+    copy: src=/tmp/myrepo/target/addressbook.war dest=/tmp/myrepo remote_src=yes
+  - name: build the dockerfile into an Image
+    command: chdir=/tmp/myrepo docker build -t myimage:ansible .
+  - name: run the image
+    command: docker run -d -P myimage:ansible
+
+
+
+
+Now go to jenkins and create a pipleine job
+
+pipeline{
+    
+    agent any
+    stages{
+      stage('Clone the repo with playbook')  
+      {
+          steps{
+              git branch: 'main', url: 'https://github.com/Sonal0409/SL-CMAT-CEP1-Jenkins-Ansible.git'
+          }
+      }
+      stage('install maven & Docker')
+      {
+          steps{
+              ansiblePlaybook credentialsId: 'ansible_credentials', disableHostKeyChecking: true, installation: 'myansible', inventory: 'dev.inv', playbook: 'PlaybookInstall.yml'
+          }
+      }
+      stage('Execute Ansible deployment playbook')
+      {
+          steps{
+              ansiblePlaybook credentialsId: 'ansible_credentials', disableHostKeyChecking: true, installation: 'myansible', inventory: 'dev.inv', playbook: 'PlaybookDeployment.yml'
+          }
+      }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
